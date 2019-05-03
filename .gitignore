@@ -55,3 +55,7 @@ profile.pdf
 profile.pkl
 clr.pyd
 dll/
+
+src/
+ok.py
+_ok.pyd
