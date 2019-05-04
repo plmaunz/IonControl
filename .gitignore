@@ -57,6 +57,10 @@ profile.pdf
 profile.pkl
 clr.pyd
 dll/
+
+src/
+ok.py
+_ok.pyd
 tests/tutorial_files/
 unittests/pygsti_addons/temp*
 *.pkl
