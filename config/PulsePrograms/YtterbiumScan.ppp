@@ -54,40 +54,40 @@ var initRemaining = 0
 var currentexperiment = 0
 
 def cool():
-	set_shutter( CoolingOn )
-	set_counter( CheckIonCounters )
-	update( CoolingTime )
-	set_counter( Null )
-	update( )
-	W = load_count( PMTChannel )
+    set_shutter( CoolingOn )
+    set_counter( CheckIonCounters )
+    update( CoolingTime )
+    set_counter( Null )
+    update( )
+    W = load_count( PMTChannel )
 
 def pump():
-	set_shutter( PumpingOn )
-	update( PumpTime )
-	set_shutter( PumpingOff )
+    set_shutter( PumpingOn )
+    update( PumpTime )
+    set_shutter( PumpingOff )
 
 def qubitInit():
-	set_dds( channel=DDSMicrowave, freq=MicrowaveFreq, phase=MicrowaveInitPhase )
-	set_trigger( ddsMicrowaveApply )
-	set_shutter( MicrowaveOn )
-	update( QubitInitTime )
-	set_shutter( MicrowaveOff )
+    set_dds( channel=DDSMicrowave, freq=MicrowaveFreq, phase=MicrowaveInitPhase )
+    set_trigger( ddsMicrowaveApply )
+    set_shutter( MicrowaveOn )
+    update( QubitInitTime )
+    set_shutter( MicrowaveOff )
 
 def qubitAnalyze():
-	set_dds( channel=DDSMicrowave, freq=MicrowaveFreq, phase=MicrowaveAnalyzePhase )
-	set_trigger( ddsMicrowaveApply )
-	set_shutter( MicrowaveOn )
-	update( QubitAnalyzeTime )
-	set_shutter( MicrowaveOff )
-	
+    set_dds( channel=DDSMicrowave, freq=MicrowaveFreq, phase=MicrowaveAnalyzePhase )
+    set_trigger( ddsMicrowaveApply )
+    set_shutter( MicrowaveOn )
+    update( QubitAnalyzeTime )
+    set_shutter( MicrowaveOff )
+    
 def detect():
-	set_dds( channel=DDSDetect, freq=DetectFreq )
-	set_shutter( DetectOn )
-	set_counter( DetectCounters )
-	set_trigger( ddsApplyTrigger )
-	update( DetectTime )
-	set_shutter( DetectOff )
-	
+    set_dds( channel=DDSDetect, freq=DetectFreq )
+    set_shutter( DetectOn )
+    set_counter( DetectCounters )
+    set_trigger( ddsApplyTrigger )
+    update( DetectTime )
+    set_shutter( DetectOff )
+    
 
 # startup switching on cooling quickly
 set_shutter( InitializationShutter )
@@ -95,27 +95,27 @@ set_dds( channel=DDSDetect, freq=DetectFreq, amp=DetectAmp )
 set_trigger( ddsApplyTrigger )
 
 while not pipe_empty():
-	update()
-	apply_next_scan_point()
-	
-	currentexperiment = 0
-	while currentexperiment < experiments:
-		cool()
-		if MaxInitRepeat>0: 
-			initRemaining = MaxInitRepeat
-			while W<PresenceThreshold:
-				if initRemaining==0:
-					exit( IonLostExitcode )
-				cool()
-		if PumpTime>0:
-			pump()
-		if QubitInitTime>0: 
-			qubitInit()
-		if QubitWaitTime>0:
-			update( QubitWaitTime )
-			qubitAnalyze()
-		if DetectTime>0:
-			detect()	
- 	currentexperiment += 1
+    update()
+    apply_next_scan_point()
+    
+    currentexperiment = 0
+    while currentexperiment < experiments:
+        cool()
+        if MaxInitRepeat>0: 
+            initRemaining = MaxInitRepeat
+            while W<PresenceThreshold:
+                if initRemaining==0:
+                    exit( IonLostExitcode )
+                cool()
+        if PumpTime>0:
+            pump()
+        if QubitInitTime>0: 
+            qubitInit()
+        if QubitWaitTime>0:
+            update( QubitWaitTime )
+            qubitAnalyze()
+        if DetectTime>0:
+            detect()    
+    currentexperiment += 1
 
 exit( endLabel )
