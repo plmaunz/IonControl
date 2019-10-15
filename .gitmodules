@@ -1,0 +1,6 @@
+[submodule "QITI_WavemeterLock"]
+	path = QITI_WavemeterLock
+	url = ./QITI_WavemeterLock
+[submodule "QITI_communicate_instruments"]
+	path = QITI_communicate_instruments
+	url = ./QITI_communicate_instruments

@@ -4,6 +4,7 @@
 # in the file "license.txt" in the top-level IonControl directory
 # *****************************************************************
 from collections import OrderedDict
+from configparser import ConfigParser
 
 import logging
 import numpy
@@ -20,7 +21,7 @@ visaEnabled = project.isEnabled('hardware', 'VISA')
 from PyQt5 import QtCore
 
 if wavemeterEnabled:
-    from wavemeter.Wavemeter import Wavemeter
+    from QITI_WavemeterLock.PID_client.PID_client import ConfigREQClient
 
 if visaEnabled:
     try:
@@ -490,9 +491,9 @@ if visaEnabled and wavemeterEnabled:
             return self.settings.use_external
 
 if wavemeterEnabled:
-    class LaserWavemeterLockScan(ExternalParameterBase):
+    class LaserWavemeterLock(ExternalParameterBase):
         """
-        Scan a laser by setting the lock point on the wavemeter lock.
+        Set a laser by setting the lock point on the wavemeter lock.
         setValue is laser frequency
         currentValue is currently set value
         currentExternalValue is frequency read from wavemeter
@@ -502,11 +503,21 @@ if wavemeterEnabled:
         def __init__(self, name, config, globalDict, instrument=None):
             logger = logging.getLogger(__name__)
             ExternalParameterBase.__init__(self, name, config, globalDict)
-            self.wavemeter = Wavemeter(instrument)
+            self.wavemeter = ConfigREQClient(self.loadconfigfile(instrument))
             #logger.info( "LaserWavemeterScan savedValue {0}".format(self.savedValue) )
             self.setDefaults()
             self.initializeChannelsToExternals()
             self.initOutput()
+        
+        def loadconfigfile(self,config_path):
+            '''Loads a configparser file from LineEdit_ConfigPath to self.config dictionary'''
+            print(config_path)
+            config_path = r'C:\Users\qiti\Desktop\IonControlWavemeter\QITI_WavemeterLock\PID_client\config.ini'
+            config = ConfigParser()
+            config.optionxform = str
+            config.read(config_path)
+            laser_config = {s:dict(config.items(s)) for s in config.sections()}
+            return laser_config
 
         def setDefaults(self):
             ExternalParameterBase.setDefaults(self)
@@ -520,7 +531,7 @@ if wavemeterEnabled:
             """
             logger = logging.getLogger(__name__)
             if value is not None:
-                self.currentFrequency = self.wavemeter.set_frequency(value, self.settings.channel, self.settings.maxAge)
+                self.currentFrequency = 21#self.wavemeter.set_frequency(value, self.settings.channel, self.settings.maxAge)
             logger.debug( "setFrequency {0}, current frequency {1}".format(self.settings.channelSettings[None].value, self.currentFrequency) )
             arrived = self.currentFrequency is not None and abs(
                 self.currentFrequency - self.settings.channelSettings[None].value) < self.settings.maxDeviation
@@ -528,10 +539,10 @@ if wavemeterEnabled:
 
         def currentExternalValue(self, channel):
             logger = logging.getLogger(__name__)
-            self.lastExternalValue = self.wavemeter.get_frequency(self.settings.channel, self.settings.maxAge )
+            self.lastExternalValue = self.wavemeter.get_config['369nm']['freq_setpoint']#self.wavemeter.get_frequency(self.settings.channel, self.settings.maxAge )
             logger.debug( str(self.lastExternalValue) )
             self.detuning=(self.lastExternalValue)
-            self.currentFrequency = self.wavemeter.get_frequency(self.settings.channel, self.settings.maxAge )
+            self.currentFrequency = self.wavemeter.get_config['369nm']['freq_setpoint'] #self.wavemeter.get_frequency(self.settings.channel, self.settings.maxAge )
             return self.lastExternalValue
 
         def paramDef(self):
