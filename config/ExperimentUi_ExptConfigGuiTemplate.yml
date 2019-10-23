@@ -95,3 +95,8 @@ hardware:
     description: Interface with the Laser frequency PID Lock using the ZeroMQ interface. Assumes PID Lock server is running. Check github.com/QITI/WavemeterLock for more details
     fields:
         PIDServerAddress: str
+  QITI SRS DS345 Function Generator:
+    description: Interface with the SRS DS345 using Prologix GPIB to ethernet controller
+    fields:
+        Prologix IP: str
+        GPIB Addr: str

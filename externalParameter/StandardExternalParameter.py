@@ -20,9 +20,6 @@ visaEnabled = project.isEnabled('hardware', 'VISA')
 from PyQt5 import QtCore
 
 
-laserfreqPID_Enabled = project.isEnabled('hardware','QITI Laser Frequency PID Lock')
-
-
 if visaEnabled:
     try:
         import visa
@@ -30,13 +27,74 @@ if visaEnabled:
         importErrorPopup('VISA')
 
 
+SRS_DS345_Enabled = project.isEnabled('hardware','QITI SRS DS345 Function Generator')
+
+if SRS_DS345_Enabled:
+    from QITI_communicate_instruments.srs.ds345 import DS345
+    
+    class SRS_DS345_FunctionGenerator(ExternalParameterBase):
+        '''
+        Communicate with the SRS DS345 function generator.
+        
+        instrument(str) -> name of the instrument should match with the name given on the initial project config
+        
+        '''
+        className = 'QITI SRS DS345 Function Generator'''
+        _outputChannels = OrderedDict([('Frequency','kHz'),
+                                       ('Amplitude(Vpp)','V'),
+                                       ('Offset','V'),
+                                       ('Function','')])
+        _inputChannels = OrderedDict([('Frequency','kHz'),
+                                       ('Amplitude(Vpp)','V'),
+                                       ('Offset','V'),
+                                       ('Function','')])
+        _outputLookup = {'Frequency':('frequency','Hz'),
+                         'Amplitude(Vpp)':('amplitude','V'),
+                         'Offset': ('offset','V'),
+                         'Function': ('function','')}
+        def __init__(self,name,config,globalDict,instrument):
+            logger = logging.getLogger(__name__)
+            ExternalParameterBase.__init__(self,name,config,globalDict)
+            project = getProject()
+            instrument_list = project.hardware.get('QITI SRS DS345 Function Generator')
+            instrument = instrument_list[instrument]
+            ip_addr = instrument.get('Prologix IP')
+            gpib_addr = instrument.get('GPIB Addr')
+            self.DS345 = DS345(ip_addr,gpib_addr)
+            logger.info("Trying to connect to the DS345 Function generator {0},{1}".format(ip_addr,gpib_addr))
+            self.DS345.connect()
+            self.initializeChannelsToExternals()
+            self.qtHelper = qtHelper()
+            self.newData = self.qtHelper.newData
+        
+        def setValue(self,channel,v):
+            func_name,unit = self._outputLookup[channel]
+            setattr(self.DS345,func_name,v.m_as(unit))
+            return v
+        
+        def getValue(self,channel):
+            func_name,unit = self._outputLookup[channel]
+            v = getattr(self.DS345,func_name)
+            return Q(v,unit)
+        
+        def getExternalValue(self,channel):
+            return self.getValue(channel)
+        
+        def connectedInstruments():
+            project = getProject()
+            instrument_list = project.hardware.get('QITI SRS DS345 Function Generator').keys()
+            return instrument_list
+            
+
+
+laserfreqPID_Enabled = project.isEnabled('hardware','QITI Laser Frequency PID Lock')
+
 if laserfreqPID_Enabled:
     try:
         from QITI_WavemeterLock.PID_client.PID_client import ConfigREQClient
     except ImportError:
         importErrorPopup('Laser Frequency PID client')
 
-if laserfreqPID_Enabled:
     class LaserFreqPID(ExternalParameterBase):
         """
         Adjust the freq_setpoint and the lock status of the laser frequency PID lock
@@ -67,7 +125,7 @@ if laserfreqPID_Enabled:
                                 }
                             }
             self.ConfigREQClient = ConfigREQClient(self.client_config)
-            logger.info("Trying to connect to the the PID server {0}".format(server))
+            logger.info("Trying to connect to the PID server {0}".format(server))
             self.ConfigREQClient.connect()
             self.initializeChannelsToExternals()
             self.qtHelper = qtHelper()
@@ -89,8 +147,9 @@ if laserfreqPID_Enabled:
             return Q( get_func(self.client_config[self.instrument][config_name]), unit )
             
         def getExternalValue(self,channel):
-            config_name,unit,get_func,set_func = self._outputLookup[channel]
-            return Q( get_func(self.client_config[self.instrument][config_name]), unit )
+            #config_name,unit,get_func,set_func = self._outputLookup[channel]
+            #return Q( get_func(self.client_config[self.instrument][config_name]), unit )
+            return self.getValue(channel)
             
 
 
