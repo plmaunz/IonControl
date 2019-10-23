@@ -91,7 +91,7 @@ hardware:
         rootCertificates: path
   VISA:
     description: communication with peripherals (e.g. GPIB, RS232, USB, Ethernet)
-  HighFinesse Wavemeter:
-    description: HighFinesse Wavemeter from Toptica photonics for reading laser wavelengths, with Java applet web interface
+  QITI Laser Frequency PID Lock:
+    description: Interface with the Laser frequency PID Lock using the ZeroMQ interface. Assumes PID Lock server is running. Check github.com/QITI/WavemeterLock for more details
     fields:
-        uri: str
+        PIDServerAddress: str

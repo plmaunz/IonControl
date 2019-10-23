@@ -20,6 +20,7 @@ dependencies:
   - qscintilla2
   - psycopg2
   - pyvisa
+  - pyvisa-py
   - sqlalchemy
   - sqlalchemy-utils
   - plotly

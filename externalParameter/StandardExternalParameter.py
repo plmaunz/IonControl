@@ -4,7 +4,6 @@
 # in the file "license.txt" in the top-level IonControl directory
 # *****************************************************************
 from collections import OrderedDict
-from configparser import ConfigParser
 
 import logging
 import numpy
@@ -14,20 +13,86 @@ from .ExternalParameterBase import ExternalParameterBase
 from ProjectConfig.Project import getProject
 from uiModules.ImportErrorPopup import importErrorPopup
 from .qtHelper import qtHelper
+import time
 
 project=getProject()
-wavemeterEnabled = project.isEnabled('hardware', 'HighFinesse Wavemeter')
 visaEnabled = project.isEnabled('hardware', 'VISA')
 from PyQt5 import QtCore
 
-if wavemeterEnabled:
-    from QITI_WavemeterLock.PID_client.PID_client import ConfigREQClient
+
+laserfreqPID_Enabled = project.isEnabled('hardware','QITI Laser Frequency PID Lock')
+
 
 if visaEnabled:
     try:
         import visa
     except ImportError: #popup on failed import of enabled visa
         importErrorPopup('VISA')
+
+
+if laserfreqPID_Enabled:
+    try:
+        from QITI_WavemeterLock.PID_client.PID_client import ConfigREQClient
+    except ImportError:
+        importErrorPopup('Laser Frequency PID client')
+
+if laserfreqPID_Enabled:
+    class LaserFreqPID(ExternalParameterBase):
+        """
+        Adjust the freq_setpoint and the lock status of the laser frequency PID lock
+        """
+        className = 'QITI Laser Frequency PID Lock'
+        _outputChannels = OrderedDict([("FrequencySetpoint","THz"),("EnableLock","")])
+        _inputChannels = OrderedDict([("FrequencySetpoint","THz"),("EnableLock","")])
+        _outputLookup = {'FrequencySetpoint':("freq_setpoint","THz",float,str),"EnableLock":("enable_lock","",lambda v:float(v=='True'),lambda v:str(bool(v)))}
+    
+        
+        def __init__(self,name,config,globalDict,instrument):
+            logger = logging.getLogger(__name__)
+            ExternalParameterBase.__init__(self,name,config,globalDict)
+            project = getProject()
+            server_list = project.hardware.get('QITI Laser Frequency PID Lock').items()
+            server_name,server = list(server_list)[0]
+            server_address,server_port = server.get('PIDServerAddress').split(":")
+            self.instrument = instrument
+            self.client_config = {
+                            'server_settings':
+                                {
+                                'config_server_ip':server_address,
+                                'config_request_port':server_port
+                                },
+                            instrument:
+                                {'freq_setpoint':None,
+                                'enable_lock':None
+                                }
+                            }
+            self.ConfigREQClient = ConfigREQClient(self.client_config)
+            logger.info("Trying to connect to the the PID server {0}".format(server))
+            self.ConfigREQClient.connect()
+            self.initializeChannelsToExternals()
+            self.qtHelper = qtHelper()
+            self.newData = self.qtHelper.newData
+        
+            #self.initOutput()
+        
+        def setValue(self,channel,v):
+            config_name,unit,get_func,set_func = self._outputLookup[channel]
+            self.client_config[self.instrument][config_name] = set_func(v.m_as(unit))
+            self.ConfigREQClient.update_config(self.client_config)
+            self.ConfigREQClient.set_config()
+            self.newData.emit(self.name+"_"+channel,(time.time(),self.getValue(channel)))
+            return v
+        
+        def getValue(self,channel):
+            config_name,unit,get_func,set_func = self._outputLookup[channel]
+            self.client_config = self.ConfigREQClient.get_config()
+            return Q( get_func(self.client_config[self.instrument][config_name]), unit )
+            
+        def getExternalValue(self,channel):
+            config_name,unit,get_func,set_func = self._outputLookup[channel]
+            return Q( get_func(self.client_config[self.instrument][config_name]), unit )
+            
+
 
 
 if visaEnabled:
@@ -440,117 +505,7 @@ if visaEnabled:
             del self.instrument
 
 
-if visaEnabled and wavemeterEnabled:
-    class LaserWavemeterScan(AgilentPowerSupply):
-        """
-        Scan a laser by changing the voltage on a HP power supply. The frequency is controlled via a VCO.
-        setValue is voltage of vco
-        currentValue is applied voltage
-        currentExternalValue are frequency read from wavemeter
-        """
 
-        className = "Laser VCO Wavemeter"
-        _dimension = Q(1, 'V')
-        def __init__(self, name, config, globalDict, instrument="power_supply_next_to_397_box"):
-            AgilentPowerSupply.__init__(self, name, config, globalDict, instrument)
-            self.setDefaults()
-            self.wavemeter = None
-            self.initOutput()
-
-        def setDefaults(self):
-            AgilentPowerSupply.setDefaults(self)
-            self.settings.__dict__.setdefault('wavemeter_address', 'http://132.175.165.36:8082')       # if True go to the target value in one jump
-            self.settings.__dict__.setdefault('wavemeter_channel', 6 )       # if True go to the target value in one jump
-            self.settings.__dict__.setdefault('use_external', True )       # if True go to the target value in one jump
-
-        def currentExternalValue(self, channel):
-            self.wavemeter = Wavemeter(self.settings.wavemeter_address)
-            logger = logging.getLogger(__name__)
-            self.lastExternalValue = self.wavemeter.get_frequency(self.settings.wavemeter_channel)
-            logger.debug( str(self.lastExternalValue) )
-            self.detuning=(self.lastExternalValue)
-            counter = 0
-            while self.detuning is None or numpy.abs(self.detuning)>=1 and counter<10:
-                self.lastExternalValue = self.wavemeter.get_frequency(self.settings.wavemeter_channel)
-                self.detuning=(self.lastExternalValue-self.settings.value[channel])
-                counter += 1
-            return self.lastExternalValue
-
-        def asyncCurrentExternalValue(self, callbackfunc ):
-            self.wavemeter = Wavemeter(self.settings.wavemeter_address) if self.wavemeter is None else self.wavemeter
-            self.wavemeter.asyncGetFrequency(self.settings.wavemeter_channel, callbackfunc)
-
-        def paramDef(self):
-            superior = AgilentPowerSupply.paramDef(self)
-            superior.append({'name': 'wavemeter_address', 'type': 'str', 'value': self.settings.wavemeter_address})
-            superior.append({'name': 'wavemeter_channel', 'type': 'int', 'value': self.settings.wavemeter_channel})
-            superior.append({'name': 'use_external', 'type': 'bool', 'value': self.settings.use_external})
-            return superior
-
-        def useExternalValue(self, channel):
-            return self.settings.use_external
-
-if wavemeterEnabled:
-    class LaserWavemeterLock(ExternalParameterBase):
-        """
-        Set a laser by setting the lock point on the wavemeter lock.
-        setValue is laser frequency
-        currentValue is currently set value
-        currentExternalValue is frequency read from wavemeter
-        """
-        className = "Laser Wavemeter Lock"
-        _outputChannels = { None: "GHz"}
-        def __init__(self, name, config, globalDict, instrument=None):
-            logger = logging.getLogger(__name__)
-            ExternalParameterBase.__init__(self, name, config, globalDict)
-            self.wavemeter = ConfigREQClient(self.loadconfigfile(instrument))
-            #logger.info( "LaserWavemeterScan savedValue {0}".format(self.savedValue) )
-            self.setDefaults()
-            self.initializeChannelsToExternals()
-            self.initOutput()
-        
-        def loadconfigfile(self,config_path):
-            '''Loads a configparser file from LineEdit_ConfigPath to self.config dictionary'''
-            print(config_path)
-            config_path = r'C:\Users\qiti\Desktop\IonControlWavemeter\QITI_WavemeterLock\PID_client\config.ini'
-            config = ConfigParser()
-            config.optionxform = str
-            config.read(config_path)
-            laser_config = {s:dict(config.items(s)) for s in config.sections()}
-            return laser_config
-
-        def setDefaults(self):
-            ExternalParameterBase.setDefaults(self)
-            self.settings.__dict__.setdefault('channel', 6)
-            self.settings.__dict__.setdefault('maxDeviation', Q(5, 'MHz'))
-            self.settings.__dict__.setdefault('maxAge', Q(2, 's'))
-
-        def setValue(self, channel, value):
-            """
-            Move one steps towards the target, return current value
-            """
-            logger = logging.getLogger(__name__)
-            if value is not None:
-                self.currentFrequency = 21#self.wavemeter.set_frequency(value, self.settings.channel, self.settings.maxAge)
-            logger.debug( "setFrequency {0}, current frequency {1}".format(self.settings.channelSettings[None].value, self.currentFrequency) )
-            arrived = self.currentFrequency is not None and abs(
-                self.currentFrequency - self.settings.channelSettings[None].value) < self.settings.maxDeviation
-            return value, arrived
-
-        def currentExternalValue(self, channel):
-            logger = logging.getLogger(__name__)
-            self.lastExternalValue = self.wavemeter.get_config['369nm']['freq_setpoint']#self.wavemeter.get_frequency(self.settings.channel, self.settings.maxAge )
-            logger.debug( str(self.lastExternalValue) )
-            self.detuning=(self.lastExternalValue)
-            self.currentFrequency = self.wavemeter.get_config['369nm']['freq_setpoint'] #self.wavemeter.get_frequency(self.settings.channel, self.settings.maxAge )
-            return self.lastExternalValue
-
-        def paramDef(self):
-            superior = ExternalParameterBase.paramDef(self)
-            superior.append({'name': 'channel', 'type': 'int', 'value': self.settings.channel})
-            superior.append({'name': 'maxDeviation', 'type': 'magnitude', 'value': self.settings.maxDeviation})
-            superior.append({'name': 'maxAge', 'type': 'magnitude', 'value': self.settings.maxAge})
-            return superior
 
 class DummyParameter(ExternalParameterBase):
     """
