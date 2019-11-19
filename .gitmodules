@@ -4,3 +4,6 @@
 [submodule "QITI_communicate_instruments"]
 	path = QITI_communicate_instruments
 	url = https://github.com/QITI/communicate_instruments
+[submodule "QITI_DC_Voltage_Control"]
+	path = QITI_DC_Voltage_Control
+	url = https://github.com/QITI/DC_Voltage_Control

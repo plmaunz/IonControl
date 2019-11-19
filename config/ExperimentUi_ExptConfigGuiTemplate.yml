@@ -100,3 +100,8 @@ hardware:
     fields:
         Prologix IP: str
         GPIB Addr: str
+  QITI Four rod DC Controller:
+    description: Interface with custom DC controller. Check github.com/senkolab/DC_Voltage_Control
+    fields:
+        ipAddress: str
+        port: str
